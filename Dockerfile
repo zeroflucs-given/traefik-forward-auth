@@ -5,5 +5,5 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o traefik-forward-auth ./cmd
 
 FROM scratch
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-COPY --from=builder /traefik-forward-auth ./
+COPY --from=builder /build/traefik-forward-auth ./
 ENTRYPOINT ["./traefik-forward-auth"]
