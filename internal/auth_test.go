@@ -26,40 +26,45 @@ func TestAuthValidateCookie(t *testing.T) {
 	c.Value = ""
 	_, err := ValidateCookie(r, c)
 	if assert.Error(err) {
-		assert.Equal("Invalid cookie format", err.Error())
+		assert.Equal("invalid cookie format", err.Error())
 	}
 	c.Value = "1|2"
 	_, err = ValidateCookie(r, c)
 	if assert.Error(err) {
-		assert.Equal("Invalid cookie format", err.Error())
+		assert.Equal("invalid cookie format", err.Error())
 	}
 	c.Value = "1|2|3|4"
 	_, err = ValidateCookie(r, c)
 	if assert.Error(err) {
-		assert.Equal("Invalid cookie format", err.Error())
+		assert.Equal("invalid cookie format", err.Error())
 	}
 
 	// Should catch invalid mac
-	c.Value = "MQ==|2|3"
+	c.Value = "MQ==|2|3|4|5"
 	_, err = ValidateCookie(r, c)
 	if assert.Error(err) {
-		assert.Equal("Invalid cookie mac", err.Error())
+		assert.Equal("invalid cookie mac", err.Error())
 	}
 
 	// Should catch expired
 	config.Lifetime = time.Second * time.Duration(-1)
-	c = MakeCookie(r, "test@test.com")
+	expectedUser := provider.User{
+		Email:  "test@example.com",
+		Name:   "Test User",
+		Groups: []string{"group-a", "group-b", "group-c"},
+	}
+	c = MakeCookie(r, expectedUser)
 	_, err = ValidateCookie(r, c)
 	if assert.Error(err) {
-		assert.Equal("Cookie has expired", err.Error())
+		assert.Equal("cookie has expired", err.Error())
 	}
 
 	// Should accept valid cookie
 	config.Lifetime = time.Second * time.Duration(10)
-	c = MakeCookie(r, "test@test.com")
-	email, err := ValidateCookie(r, c)
+	c = MakeCookie(r, expectedUser)
+	actualUser, err := ValidateCookie(r, c)
 	assert.Nil(err, "valid request should not return an error")
-	assert.Equal("test@test.com", email, "valid request should return user email")
+	assert.Equal(expectedUser, actualUser, "valid request should return user email")
 }
 
 func TestAuthValidateEmail(t *testing.T) {
@@ -260,10 +265,15 @@ func TestAuthMakeCookie(t *testing.T) {
 	r, _ := http.NewRequest("GET", "http://app.example.com", nil)
 	r.Header.Add("X-Forwarded-Host", "app.example.com")
 
-	c := MakeCookie(r, "test@example.com")
+	user := provider.User{
+		Email:  "test@example.com",
+		Name:   "Test User",
+		Groups: []string{"group-a", "group-b", "group-c"},
+	}
+	c := MakeCookie(r, user)
 	assert.Equal("_forward_auth", c.Name)
 	parts := strings.Split(c.Value, "|")
-	assert.Len(parts, 3, "cookie should be 3 parts")
+	assert.Len(parts, 5, "cookie should be 3 parts")
 	_, err := ValidateCookie(r, c)
 	assert.Nil(err, "should generate valid cookie")
 	assert.Equal("/", c.Path)
@@ -275,7 +285,7 @@ func TestAuthMakeCookie(t *testing.T) {
 
 	config.CookieName = "testname"
 	config.InsecureCookie = true
-	c = MakeCookie(r, "test@example.com")
+	c = MakeCookie(r, user)
 	assert.Equal("testname", c.Name)
 	assert.False(c.Secure)
 }
@@ -329,13 +339,13 @@ func TestAuthValidateCSRFCookie(t *testing.T) {
 	valid, _, _, err := ValidateCSRFCookie(c, state)
 	assert.False(valid)
 	if assert.Error(err) {
-		assert.Equal("Invalid CSRF cookie value", err.Error())
+		assert.Equal("invalid CSRF cookie value", err.Error())
 	}
 	c.Value = "123456789012345678901234567890123"
 	valid, _, _, err = ValidateCSRFCookie(c, state)
 	assert.False(valid)
 	if assert.Error(err) {
-		assert.Equal("Invalid CSRF cookie value", err.Error())
+		assert.Equal("invalid CSRF cookie value", err.Error())
 	}
 
 	// Should require provider
@@ -344,7 +354,7 @@ func TestAuthValidateCSRFCookie(t *testing.T) {
 	valid, _, _, err = ValidateCSRFCookie(c, state)
 	assert.False(valid)
 	if assert.Error(err) {
-		assert.Equal("Invalid CSRF state format", err.Error())
+		assert.Equal("invalid CSRF state format", err.Error())
 	}
 
 	// Should allow valid state
@@ -364,7 +374,7 @@ func TestValidateState(t *testing.T) {
 	state := "12345678901234567890123456789012:"
 	err := ValidateState(state)
 	if assert.Error(err) {
-		assert.Equal("Invalid CSRF state value", err.Error())
+		assert.Equal("invalid CSRF state value", err.Error())
 	}
 	// Should pass this state
 	state = "12345678901234567890123456789012:p99:url123"
@@ -396,11 +406,11 @@ func TestMakeState(t *testing.T) {
 
 func TestAuthNonce(t *testing.T) {
 	assert := assert.New(t)
-	err, nonce1 := Nonce()
+	nonce1, err := Nonce()
 	assert.Nil(err, "error generating nonce")
 	assert.Len(nonce1, 32, "length should be 32 chars")
 
-	err, nonce2 := Nonce()
+	nonce2, err := Nonce()
 	assert.Nil(err, "error generating nonce")
 	assert.Len(nonce2, 32, "length should be 32 chars")
 

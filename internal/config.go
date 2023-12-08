@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"regexp"
 	"strconv"
@@ -242,7 +241,7 @@ func handleFlagError(err error) error {
 var legacyFileFormat = regexp.MustCompile(`(?m)^([a-z-]+) (.*)$`)
 
 func convertLegacyToIni(name string) (io.Reader, error) {
-	b, err := ioutil.ReadFile(name)
+	b, err := os.ReadFile(name)
 	if err != nil {
 		return nil, err
 	}
@@ -288,7 +287,7 @@ func (c *Config) GetProvider(name string) (provider.Provider, error) {
 		return &c.Providers.GenericOAuth, nil
 	}
 
-	return nil, fmt.Errorf("Unknown provider: %s", name)
+	return nil, fmt.Errorf("unknown provider: %s", name)
 }
 
 // GetConfiguredProvider returns the provider of the given name, if it has been
@@ -296,7 +295,7 @@ func (c *Config) GetProvider(name string) (provider.Provider, error) {
 func (c *Config) GetConfiguredProvider(name string) (provider.Provider, error) {
 	// Check the provider has been configured
 	if !c.providerConfigured(name) {
-		return nil, fmt.Errorf("Unconfigured provider: %s", name)
+		return nil, fmt.Errorf("unconfigured provider: %s", name)
 	}
 
 	return c.GetProvider(name)

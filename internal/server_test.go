@@ -2,7 +2,7 @@ package tfa
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -14,6 +14,7 @@ import (
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/zeroflucs-given/traefik-forward-auth/internal/provider"
 	"golang.org/x/oauth2"
 )
 
@@ -98,7 +99,12 @@ func TestServerAuthHandlerInvalid(t *testing.T) {
 
 	// Should catch invalid cookie
 	req = newDefaultHttpRequest("/foo")
-	c := MakeCookie(req, "test@example.com")
+	user := provider.User{
+		Email:  "test@example.com",
+		Name:   "Test User",
+		Groups: []string{"group-a", "group-b", "group-c"},
+	}
+	c := MakeCookie(req, user)
 	parts = strings.Split(c.Value, "|")
 	c.Value = fmt.Sprintf("bad|%s|%s", parts[1], parts[2])
 
@@ -107,7 +113,7 @@ func TestServerAuthHandlerInvalid(t *testing.T) {
 
 	// Should validate email
 	req = newDefaultHttpRequest("/foo")
-	c = MakeCookie(req, "test@example.com")
+	c = MakeCookie(req, user)
 	config.Domains = []string{"test.com"}
 
 	res, _ = doHttpRequest(req, c)
@@ -122,7 +128,12 @@ func TestServerAuthHandlerExpired(t *testing.T) {
 
 	// Should redirect expired cookie
 	req := newHTTPRequest("GET", "http://example.com/foo")
-	c := MakeCookie(req, "test@example.com")
+	user := provider.User{
+		Email:  "test@example.com",
+		Name:   "Test User",
+		Groups: []string{"group-a", "group-b", "group-c"},
+	}
+	c := MakeCookie(req, user)
 	res, _ := doHttpRequest(req, c)
 	require.Equal(t, 307, res.StatusCode, "request with expired cookie should be redirected")
 
@@ -148,7 +159,12 @@ func TestServerAuthHandlerValid(t *testing.T) {
 
 	// Should allow valid request email
 	req := newHTTPRequest("GET", "http://example.com/foo")
-	c := MakeCookie(req, "test@example.com")
+	user := provider.User{
+		Email:  "test@example.com",
+		Name:   "Test User",
+		Groups: []string{"group-a", "group-b", "group-c"},
+	}
+	c := MakeCookie(req, user)
 	config.Domains = []string{}
 
 	res, _ := doHttpRequest(req, c)
@@ -537,13 +553,13 @@ func doHttpRequest(r *http.Request, c *http.Cookie) (*http.Response, string) {
 
 	// Copy into request
 	for _, c := range w.HeaderMap["Set-Cookie"] {
-		r.Header.Add("Cookie", c)
+		r.Header.Set("Cookie", c)
 	}
 
 	NewServer().RootHandler(w, r)
 
 	res := w.Result()
-	body, _ := ioutil.ReadAll(res.Body)
+	body, _ := io.ReadAll(res.Body)
 
 	// if res.StatusCode > 300 && res.StatusCode < 400 {
 	// 	fmt.Printf("%#v", res.Header)

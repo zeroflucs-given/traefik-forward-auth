@@ -74,7 +74,7 @@ func (o *OIDC) ExchangeCode(redirectURI, code string) (string, error) {
 	// Extract ID token
 	rawIDToken, ok := token.Extra("id_token").(string)
 	if !ok {
-		return "", errors.New("Missing id_token")
+		return "", errors.New("missing id_token")
 	}
 
 	return rawIDToken, nil

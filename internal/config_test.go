@@ -351,7 +351,7 @@ func TestConfigValidate(t *testing.T) {
 	assert.Len(logs, 1)
 
 	// Should have error for rule provider
-	assert.Equal("Unknown provider: bad2", logs[0].Message)
+	assert.Equal("unknown provider: bad2", logs[0].Message)
 	assert.Equal(logrus.FatalLevel, logs[0].Level)
 }
 
@@ -375,9 +375,9 @@ func TestConfigGetProvider(t *testing.T) {
 	assert.Equal(&c.Providers.GenericOAuth, p)
 
 	// Should catch unknown provider
-	p, err = c.GetProvider("bad")
+	_, err = c.GetProvider("bad")
 	if assert.Error(err) {
-		assert.Equal("Unknown provider: bad", err.Error())
+		assert.Equal("unknown provider: bad", err.Error())
 	}
 }
 
@@ -391,9 +391,9 @@ func TestConfigGetConfiguredProvider(t *testing.T) {
 	assert.Equal(&c.Providers.Google, p)
 
 	// Should fail to get valid "oidc" provider as it's not configured
-	p, err = c.GetConfiguredProvider("oidc")
+	_, err = c.GetConfiguredProvider("oidc")
 	if assert.Error(err) {
-		assert.Equal("Unconfigured provider: oidc", err.Error())
+		assert.Equal("unconfigured provider: oidc", err.Error())
 	}
 }
 

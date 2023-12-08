@@ -19,41 +19,48 @@ import (
 
 // ValidateCookie verifies that a cookie matches the expected format of:
 // Cookie = hash(secret, cookie domain, email, expires)|expires|email
-func ValidateCookie(r *http.Request, c *http.Cookie) (string, error) {
+func ValidateCookie(r *http.Request, c *http.Cookie) (provider.User, error) {
+	user := provider.User{}
+
 	parts := strings.Split(c.Value, "|")
 
-	if len(parts) != 3 {
-		return "", errors.New("Invalid cookie format")
+	if len(parts) != 5 {
+		return user, errors.New("invalid cookie format")
 	}
+
+	expiry := parts[1]
+	user.Email = parts[2]
+	user.Name = parts[3]
+	user.Groups = strings.Split(parts[4], ",")
 
 	mac, err := base64.URLEncoding.DecodeString(parts[0])
 	if err != nil {
-		return "", errors.New("Unable to decode cookie mac")
+		return user, errors.New("unable to decode cookie mac")
 	}
 
-	expectedSignature := cookieSignature(r, parts[2], parts[1])
+	expectedSignature := cookieSignature(r, expiry, user)
 	expected, err := base64.URLEncoding.DecodeString(expectedSignature)
 	if err != nil {
-		return "", errors.New("Unable to generate mac")
+		return user, errors.New("unable to generate mac")
 	}
 
 	// Valid token?
 	if !hmac.Equal(mac, expected) {
-		return "", errors.New("Invalid cookie mac")
+		return user, errors.New("invalid cookie mac")
 	}
 
-	expires, err := strconv.ParseInt(parts[1], 10, 64)
+	expires, err := strconv.ParseInt(expiry, 10, 64)
 	if err != nil {
-		return "", errors.New("Unable to parse cookie expiry")
+		return user, errors.New("unable to parse cookie expiry")
 	}
 
 	// Has it expired?
 	if time.Unix(expires, 0).Before(time.Now()) {
-		return "", errors.New("Cookie has expired")
+		return user, errors.New("cookie has expired")
 	}
 
 	// Looks valid
-	return parts[2], nil
+	return user, nil
 }
 
 // ValidateEmail checks if the given email address matches either a whitelisted
@@ -162,10 +169,10 @@ func useAuthDomain(r *http.Request) (bool, string) {
 // Cookie methods
 
 // MakeCookie creates an auth cookie
-func MakeCookie(r *http.Request, email string) *http.Cookie {
+func MakeCookie(r *http.Request, user provider.User) *http.Cookie {
 	expires := cookieExpiry()
-	mac := cookieSignature(r, email, fmt.Sprintf("%d", expires.Unix()))
-	value := fmt.Sprintf("%s|%d|%s", mac, expires.Unix(), email)
+	mac := cookieSignature(r, fmt.Sprintf("%d", expires.Unix()), user)
+	value := fmt.Sprintf("%s|%d|%s|%s|%s", mac, expires.Unix(), user.Email, user.Name, strings.Join(user.Groups[:], ","))
 
 	return &http.Cookie{
 		Name:     config.CookieName,
@@ -234,19 +241,19 @@ func FindCSRFCookie(r *http.Request, state string) (c *http.Cookie, err error) {
 // ValidateCSRFCookie validates the csrf cookie against state
 func ValidateCSRFCookie(c *http.Cookie, state string) (valid bool, provider string, redirect string, err error) {
 	if len(c.Value) != 32 {
-		return false, "", "", errors.New("Invalid CSRF cookie value")
+		return false, "", "", errors.New("invalid CSRF cookie value")
 	}
 
 	// Check nonce match
 	if c.Value != state[:32] {
-		return false, "", "", errors.New("CSRF cookie does not match state")
+		return false, "", "", errors.New("csrf cookie does not match state")
 	}
 
 	// Extract provider
 	params := state[33:]
 	split := strings.Index(params, ":")
 	if split == -1 {
-		return false, "", "", errors.New("Invalid CSRF state format")
+		return false, "", "", errors.New("invalid CSRF state format")
 	}
 
 	// Valid, return provider and redirect
@@ -261,20 +268,20 @@ func MakeState(r *http.Request, p provider.Provider, nonce string) string {
 // ValidateState checks whether the state is of right length.
 func ValidateState(state string) error {
 	if len(state) < 34 {
-		return errors.New("Invalid CSRF state value")
+		return errors.New("invalid CSRF state value")
 	}
 	return nil
 }
 
 // Nonce generates a random nonce
-func Nonce() (error, string) {
+func Nonce() (string, error) {
 	nonce := make([]byte, 16)
 	_, err := rand.Read(nonce)
 	if err != nil {
-		return err, ""
+		return "", err
 	}
 
-	return nil, fmt.Sprintf("%x", nonce)
+	return fmt.Sprintf("%x", nonce), nil
 }
 
 // Cookie domain
@@ -313,11 +320,13 @@ func matchCookieDomains(domain string) (bool, string) {
 }
 
 // Create cookie hmac
-func cookieSignature(r *http.Request, email, expires string) string {
+func cookieSignature(r *http.Request, expires string, user provider.User) string {
 	hash := hmac.New(sha256.New, config.Secret)
 	hash.Write([]byte(cookieDomain(r)))
-	hash.Write([]byte(email))
 	hash.Write([]byte(expires))
+	hash.Write([]byte(user.Email))
+	hash.Write([]byte(user.Name))
+	hash.Write([]byte(strings.Join(user.Groups, "")))
 	return base64.URLEncoding.EncodeToString(hash.Sum(nil))
 }
 
