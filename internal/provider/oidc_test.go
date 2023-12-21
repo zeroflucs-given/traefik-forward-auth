@@ -152,10 +152,10 @@ func setupOIDCTest(t *testing.T, bodyValues map[string]map[string]string) (*OIDC
 
 	// Setup provider
 	p := OIDC{
-		ClientID:         "idtest",
-		ClientSecret:     "sectest",
-		IssuerURL:        serverURL.String(),
-		AdditionalScopes: "groups",
+		ClientID:     "idtest",
+		ClientSecret: "sectest",
+		IssuerURL:    serverURL.String(),
+		Scopes:       []string{"openid profile email groups"},
 	}
 
 	// Initialise config/verifier

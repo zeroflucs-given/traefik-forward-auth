@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"errors"
-	"strings"
 
 	"github.com/coreos/go-oidc"
 	"golang.org/x/oauth2"
@@ -11,10 +10,10 @@ import (
 
 // OIDC provider
 type OIDC struct {
-	IssuerURL        string `long:"issuer-url" env:"ISSUER_URL" description:"Issuer URL"`
-	ClientID         string `long:"client-id" env:"CLIENT_ID" description:"Client ID"`
-	ClientSecret     string `long:"client-secret" env:"CLIENT_SECRET" description:"Client Secret" json:"-"`
-	AdditionalScopes string `long:"additional-scopes" env:"ADDITIONAL_SCOPES" description:"Additional Scopes"`
+	IssuerURL    string   `long:"issuer-url" env:"ISSUER_URL" description:"Issuer URL"`
+	ClientID     string   `long:"client-id" env:"CLIENT_ID" description:"Client ID"`
+	ClientSecret string   `long:"client-secret" env:"CLIENT_SECRET" description:"Client Secret" json:"-"`
+	Scopes       []string `long:"scope" env:"SCOPE" env-delim:"," default:"openid" default:"profile" default:"email" description:"Scopes"`
 
 	OAuthProvider
 
@@ -48,13 +47,8 @@ func (o *OIDC) Setup() error {
 		ClientID:     o.ClientID,
 		ClientSecret: o.ClientSecret,
 		Endpoint:     o.provider.Endpoint(),
-
-		// "openid" is a required scope for OpenID Connect flows.
-		Scopes: []string{oidc.ScopeOpenID, "profile", "email"},
+		Scopes:       o.Scopes,
 	}
-
-	additionalScopes := strings.Split(o.AdditionalScopes, ",")
-	o.Config.Scopes = append(o.Config.Scopes, additionalScopes...)
 
 	// Create OIDC verifier
 	o.verifier = o.provider.Verifier(&oidc.Config{
