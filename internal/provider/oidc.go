@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/coreos/go-oidc"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 )
 
@@ -82,6 +83,8 @@ func (o *OIDC) ExchangeCode(redirectURI, code string) (string, error) {
 // GetUser uses the given token and returns a complete provider.User object
 func (o *OIDC) GetUser(token string) (User, error) {
 	var user User
+
+	logrus.WithField("token", token).Debug("extracing user from token")
 
 	// Parse & Verify ID Token
 	idToken, err := o.verifier.Verify(o.ctx, token)
