@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 
+	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 )
 
@@ -91,6 +93,18 @@ func (o *GenericOAuth) GetUser(token string) (User, error) {
 
 	defer res.Body.Close()
 	err = json.NewDecoder(res.Body).Decode(&user)
+
+	respBytes, errRead := io.ReadAll(res.Body)
+	if errRead != nil {
+		logrus.WithField("error", errRead).Error("error reading res body for debug logging")
+	} else {
+		logrus.WithFields(logrus.Fields{
+			"token":       token,
+			"token_style": o.TokenStyle,
+			"user_url":    o.UserURL,
+			"body":        string(respBytes),
+		}).Debug("retrieving user info from user URL")
+	}
 
 	return user, err
 }
