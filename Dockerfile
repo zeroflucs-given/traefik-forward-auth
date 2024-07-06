@@ -1,4 +1,4 @@
-FROM golang:1.21.5-alpine as builder
+FROM golang:1.22.5-alpine as builder
 WORKDIR /build
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o traefik-forward-auth ./cmd
